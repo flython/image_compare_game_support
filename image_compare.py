@@ -14,7 +14,7 @@ class CompareWindow(QMainWindow):
         self.setGeometry(100, 100, 800, 400)
         
         # 设置窗口属性
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)  # 无边框和置顶
         self.setAttribute(Qt.WA_TranslucentBackground)  # 设置窗口背景透明
         
         # 初始化变量
@@ -35,7 +35,6 @@ class CompareWindow(QMainWindow):
                 border-top-right-radius: 5px;
             }
         """)
-        self.title_bar.setAttribute(Qt.WA_TransparentForMouseEvents, False)  # 标题栏不穿透
         
         # 标题栏布局
         title_layout = QHBoxLayout(self.title_bar)
@@ -65,21 +64,21 @@ class CompareWindow(QMainWindow):
         
         # 创建内容区域（透明背景）
         content_widget = QWidget()
-        content_widget.setAttribute(Qt.WA_TransparentForMouseEvents)  # 整个内容区域鼠标穿透
+        content_widget.setAttribute(Qt.WA_TransparentForMouseEvents, True)  # 内容区域穿透
         content_layout = QHBoxLayout(content_widget)
         content_layout.setContentsMargins(10, 0, 10, 10)
         content_layout.setSpacing(70)  # 设置左右区域间距为70
+
         
         # 创建主副窗口的截图区域
         self.main_area = QLabel()
         self.main_area.setStyleSheet("background-color: rgba(255, 0, 0, 50);")
         self.main_area.setFixedSize(self.window_width, self.window_height)
-        self.main_area.setAttribute(Qt.WA_TransparentForMouseEvents, True)  # 添加鼠标穿透
         
         self.sub_area = QLabel()
         self.sub_area.setStyleSheet("background-color: rgba(0, 0, 255, 50);")
         self.sub_area.setFixedSize(self.window_width, self.window_height)
-        self.sub_area.setAttribute(Qt.WA_TransparentForMouseEvents, True)  # 添加鼠标穿透
+
         
         content_layout.addWidget(self.main_area)
         content_layout.addWidget(self.sub_area)
@@ -93,21 +92,26 @@ class CompareWindow(QMainWindow):
         
         # 设置主窗口边框样式
         central_widget = QWidget()
+        central_widget.setAttribute(Qt.WA_TransparentForMouseEvents, False)  # 中央部件不穿透
         central_widget.setStyleSheet("""
             QWidget {
-                background-color: rgba(60, 60, 60, 128);
-                border: 1px solid #555555;
-                border-radius: 5px;
+                background-color: transparent;
             }
         """)
-        central_widget.setAttribute(Qt.WA_TransparentForMouseEvents, True)  # 中央部件穿透
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
         
         # 创建差异显示窗口
         self.diff_window = QMainWindow()
         self.diff_window.setWindowTitle("差异显示")
-        self.diff_window.setGeometry(800, 100, 400, 400)  # 增加高度以容纳按钮
+        
+        # 获取屏幕尺寸，设置差异窗口位置在右下角
+        screen = QApplication.primaryScreen().geometry()
+        diff_width = 400
+        diff_height = 400
+        diff_x = screen.width() - diff_width - 20  # 右边距离20像素
+        diff_y = screen.height() - diff_height - 40  # 下边距离40像素（考虑任务栏）
+        self.diff_window.setGeometry(diff_x, diff_y, diff_width, diff_height)
         
         # 创建中央部件和布局
         diff_central = QWidget()
@@ -227,81 +231,26 @@ class CompareWindow(QMainWindow):
         self.diff_label.setPixmap(QPixmap.fromImage(q_img))
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            # 只在标题栏区域响应事件
-            if event.pos().y() <= self.title_bar.height():
-                # 检查是否在窗口边缘
-                edge_size = 10
-                pos = event.pos()
-                rect = self.rect()
-                if (pos.x() >= rect.right() - edge_size or 
-                    pos.y() >= rect.bottom() - edge_size):
-                    self.resizing = True
-                    self.resize_start_pos = event.globalPos()
-                    self.start_geometry = self.geometry()
-                else:
-                    self.resizing = False
-                    self.drag_position = event.globalPos() - self.frameGeometry().topLeft()
-                event.accept()
-            else:
-                event.ignore()  # 忽略标题栏外的点击事件
-        
-    def mouseMoveEvent(self, event):
-        # 只在标题栏区域响应事件
         if event.pos().y() <= self.title_bar.height():
-            # 检查是否在窗口边缘
-            edge_size = 10
-            pos = event.pos()
-            rect = self.rect()
-            
-            # 设置鼠标样式
-            if pos.x() >= rect.right() - edge_size:
-                self.setCursor(Qt.SizeHorCursor)
-            elif pos.y() >= rect.bottom() - edge_size:
-                self.setCursor(Qt.SizeVerCursor)
-            else:
-                self.setCursor(Qt.ArrowCursor)
+            if event.button() == Qt.LeftButton:
+                self.drag_position = event.globalPos() - self.frameGeometry().topLeft()
+                event.accept()
+        else:
+            event.ignore()
 
-            # 处理窗口移动和大小调整
-            if self.resizing and event.buttons() == Qt.LeftButton:
-                diff = event.globalPos() - self.resize_start_pos
-                new_geometry = self.start_geometry
-                min_width = 400  # 最小宽度
-                min_height = 200  # 最小高度
-                
-                # 处理宽度调整
-                if pos.x() >= rect.right() - edge_size:
-                    new_width = max(min_width, self.start_geometry.width() + diff.x())
-                    self.window_width = new_width // 2
-                    new_geometry.setWidth(new_width)
-                
-                # 处理高度调整
-                if pos.y() >= rect.bottom() - edge_size:
-                    new_height = max(min_height, self.start_geometry.height() + diff.y())
-                    self.window_height = new_height
-                    new_geometry.setHeight(new_height)
-                
-                self.setGeometry(new_geometry)
-                self.main_area.setFixedSize(self.window_width, self.window_height)
-                self.sub_area.setFixedSize(self.window_width, self.window_height)
-                
-            elif not self.resizing and event.buttons() == Qt.LeftButton:
-                # 移动窗口
-                self.move(event.globalPos() - self.drag_position)
-                self.capture_and_compare()
+    def mouseMoveEvent(self, event):
+        if event.pos().y() <= self.title_bar.height() and event.buttons() == Qt.LeftButton:
+            self.move(event.globalPos() - self.drag_position)
+            self.capture_and_compare()
             event.accept()
         else:
-            event.ignore()  # 忽略标题栏外的移动事件
+            event.ignore()
 
     def mouseReleaseEvent(self, event):
-        # 只在标题栏区域响应事件
         if event.pos().y() <= self.title_bar.height():
-            self.resizing = False
-            self.resize_start_pos = None
-            self.start_geometry = None
             event.accept()
         else:
-            event.ignore()  # 忽略标题栏外的释放事件
+            event.ignore()
 
     def enterEvent(self, event):
         self.setCursor(Qt.ArrowCursor)
