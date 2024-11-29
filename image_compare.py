@@ -98,7 +98,7 @@ class CompareWindow(QMainWindow):
             }
         """)
         content_layout = QHBoxLayout(content_widget)
-        content_layout.setContentsMargins(10, 0, 10, 10)
+        content_layout.setContentsMargins(10, 10, 10, 10)
         content_layout.setSpacing(70)  # 设置左右区域间距为70
 
         # 创建主副窗口的截图区域
@@ -145,6 +145,8 @@ class CompareWindow(QMainWindow):
         self.diff_window = QMainWindow()
         self.diff_window.setWindowFlags(Qt.WindowStaysOnTopHint)
         self.diff_window.setWindowTitle(f"差异显示 - {self.mode_names[self.display_mode]}")
+        # 重写diff_window的closeEvent，关闭差异窗口时，关闭主窗口
+        self.diff_window.closeEvent = lambda event: self.close_application()
 
         # 获取屏幕尺寸，设置差异窗口位置在屏幕中央
         screen = QApplication.primaryScreen().geometry()
@@ -286,18 +288,18 @@ class CompareWindow(QMainWindow):
                 
                 if self.display_mode == 'rgb':
                     # RGB对比：分别对比每个通道，加权合并
-                    diff_r = cv2.absdiff(main_rgb[:,:,0], sub_rgb[:,:,0]) * 0.3
-                    diff_g = cv2.absdiff(main_rgb[:,:,1], sub_rgb[:,:,1]) * 0.59
-                    diff_b = cv2.absdiff(main_rgb[:,:,2], sub_rgb[:,:,2]) * 0.11
+                    diff_r = cv2.absdiff(main_rgb[:,:,0], sub_rgb[:,:,0])
+                    diff_g = cv2.absdiff(main_rgb[:,:,1], sub_rgb[:,:,1])
+                    diff_b = cv2.absdiff(main_rgb[:,:,2], sub_rgb[:,:,2])
                     diff = diff_r + diff_g + diff_b
-                    threshold = 30
+                    threshold = 60
                     
                 elif self.display_mode == 'gray':
                     # 灰度对比：转换为灰度后对比
                     main_gray = cv2.cvtColor(main_screenshot, cv2.COLOR_BGR2GRAY)
                     sub_gray = cv2.cvtColor(sub_screenshot, cv2.COLOR_BGR2GRAY)
                     diff = cv2.absdiff(main_gray, sub_gray)
-                    threshold = 40
+                    threshold = 70
                     
                 elif self.display_mode == 'hsv':
                     # HSV对比：在HSV空间进行对比，加权H通道
@@ -336,8 +338,8 @@ class CompareWindow(QMainWindow):
                 _, diff_thresh = cv2.threshold(diff, threshold, 255, cv2.THRESH_BINARY)
 
                 # 进行形态学操作，去除小的噪点
-                kernel = np.ones((3,3), np.uint8)
-                diff_thresh = cv2.morphologyEx(diff_thresh, cv2.MORPH_OPEN, kernel)
+                # kernel = np.ones((3,3), np.uint8)
+                # diff_thresh = cv2.morphologyEx(diff_thresh, cv2.MORPH_OPEN, kernel)
 
                 # 在左侧显示原图，并在差异处用黄色标记
                 display_img = main_rgb.copy()
